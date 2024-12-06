@@ -2,7 +2,7 @@
     $host = "localhost";
     $user = "root";  // Replace with your username
     $password = "1234";  // Replace with your password
-    $dbname = "invoicesystem";
+    $dbname = "invoice_system";
 
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$dbname", $user, $password);
