@@ -1,11 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import InvoiceForm from './components/InvoiceForm';
-import InvoiceList from './components/InvoiceList';
-import InvoiceDetails from './components/InvoiceDetails';
+import {InvoiceForm} from './components/InvoiceForm';
+import {InvoiceList} from './components/InvoiceList';
+import {InvoiceDetails} from './components/InvoiceDetails';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
-function App() {
+
+export function App() {
   return (
     <Router>
       <div>
@@ -18,5 +20,3 @@ function App() {
     </Router>
   );
 }
-
-export default App;

@@ -1,43 +1,64 @@
 <?php
-    include 'db.php';
+header("Access-Control-Allow-Origin: http://localhost:5173"); // Permitir solicitudes desde el origen del frontend
+header("Access-Control-Allow-Methods: POST, OPTIONS"); // Métodos permitidos
+header("Access-Control-Allow-Headers: Content-Type"); // Encabezados permitidos
+header("Access-Control-Max-Age: 86400"); // Cache preflight durante 1 día
+include 'db.php';
 
-    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-        $customerID = $_POST['CustomerID'];
-        $products = $_POST['Products']; // Array of product IDs and quantities
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Decodifica los datos JSON enviados desde Postman
+    $input = json_decode(file_get_contents('php://input'), true);
 
-        try {
-            $pdo->beginTransaction();
+    if (!$input) {
+        echo json_encode(["error" => "Invalid JSON"]);
+        exit;
+    }
 
-            // Insert into Invoices
-            $stmt = $pdo->prepare("INSERT INTO Invoices (CustomerID, Total) VALUES (?, ?)");
-            $stmt->execute([$customerID, 0]);
-            $invoiceID = $pdo->lastInsertId();
+    $customerID = $input['CustomerID'] ?? null;
+    $products = $input['Products'] ?? [];
 
-            $total = 0;
+    if (!$customerID || empty($products)) {
+        echo json_encode(["error" => "Missing CustomerID or Products"]);
+        exit;
+    }
 
-            // Insert into InvoiceDetails
-            foreach ($products as $product) {
-                $stmt = $pdo->prepare("SELECT Price FROM Products WHERE ProductID = ?");
-                $stmt->execute([$product['ProductID']]);
-                $price = $stmt->fetchColumn();
+    try {
+        $pdo->beginTransaction();
 
-                $quantity = $product['Quantity'];
-                $lineTotal = $price * $quantity;
-                $total += $lineTotal;
+        // Inserta en la tabla de facturas
+        $stmt = $pdo->prepare("INSERT INTO Invoices (CustomerID, Total) VALUES (?, ?)");
+        $stmt->execute([$customerID, 0]);
+        $invoiceID = $pdo->lastInsertId();
 
-                $stmt = $pdo->prepare("INSERT INTO InvoiceDetails (InvoiceID, ProductID, Quantity, Price) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$invoiceID, $product['ProductID'], $quantity, $lineTotal]);
+        $total = 0;
+
+        // Procesa los productos y calcula el total
+        foreach ($products as $product) {
+            $stmt = $pdo->prepare("SELECT Price FROM Products WHERE ProductID = ?");
+            $stmt->execute([$product['ProductID']]);
+            $price = $stmt->fetchColumn();
+
+            if (!$price) {
+                throw new Exception("ProductID " . $product['ProductID'] . " not found");
             }
 
-            // Update Invoice Total
-            $stmt = $pdo->prepare("UPDATE Invoices SET Total = ? WHERE InvoiceID = ?");
-            $stmt->execute([$total, $invoiceID]);
+            $quantity = $product['Quantity'];
+            $lineTotal = $price * $quantity;
+            $total += $lineTotal;
 
-            $pdo->commit();
-            echo json_encode(["message" => "Invoice created successfully", "InvoiceID" => $invoiceID]);
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            echo json_encode(["error" => $e->getMessage()]);
+            $stmt = $pdo->prepare("INSERT INTO InvoiceDetails (InvoiceID, ProductID, Quantity, Price) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$invoiceID, $product['ProductID'], $quantity, $price]);
         }
+
+        // Actualiza el total en la factura
+        $stmt = $pdo->prepare("UPDATE Invoices SET Total = ? WHERE InvoiceID = ?");
+        $stmt->execute([$total, $invoiceID]);
+
+        $pdo->commit();
+        echo json_encode(["message" => "Invoice created successfully", "InvoiceID" => $invoiceID]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(["error" => $e->getMessage()]);
     }
+}
 ?>
